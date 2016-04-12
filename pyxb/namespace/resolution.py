@@ -88,7 +88,7 @@ class _NamespaceResolution_mixin (pyxb.cscRoot):
 
     # A list of Namespace._Resolvable_mixin instances that have yet to be
     # resolved.
-    __unresolvedComponents = None
+    __unresolvedComponents = []
 
     # A map from Namespace._Resolvable_mixin instances in
     # __unresolvedComponents to sets of other unresolved objects on which they
@@ -248,7 +248,7 @@ class _NamespaceResolution_mixin (pyxb.cscRoot):
 
         # Replace the list of unresolved components with None, so that
         # attempts to subsequently add another component fail.
-        self.__unresolvedComponents = None
+        self.__unresolvedComponents = []
         self.__unresolvedDependents = None
 
         # NOTE: Dependencies may require that we keep these around for a while
