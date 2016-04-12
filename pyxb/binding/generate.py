@@ -733,8 +733,8 @@ def BuildPluralityData (term_tree):
     to potentially occur more than once."""
 
     def _ttMergeSets (parent, child):
-        (p1, pm) = parent
-        (c1, cm) = child
+        (p1, pm, pc) = parent
+        (c1, cm, cc) = child
 
         # Anything multiple in the child becomes multiple in the parent.
         pm.update(cm)
@@ -752,6 +752,10 @@ def BuildPluralityData (term_tree):
         # child is no longer single in the parent.
         p1.symmetric_difference_update(c1)
 
+        # The two dictionaries are joined
+        for k, v in cc.items():
+            pc[k] = v
+
     def _ttPrePluralityWalk (node, pos, arg):
         # If there are multiple children, create a new list on which they
         # will be placed.
@@ -762,7 +766,8 @@ def BuildPluralityData (term_tree):
         # Initialize a fresh result for this node
         singles = set()
         multiples = set()
-        combined = (singles, multiples)
+        cards = dict()
+        combined = (singles, multiples, cards)
         if isinstance(node, pyxb.utils.fac.MultiTermNode):
             # Get the list of children, and examine
             term_list = arg.pop()
@@ -779,6 +784,7 @@ def BuildPluralityData (term_tree):
                     _ttMergeSets(combined, tt)
         elif isinstance(node, pyxb.utils.fac.Symbol):
             (particle, term) = node.metadata
+            cards[term.baseDeclaration()] = (particle.minOccurs(), particle.maxOccurs())
             if isinstance(term, xs.structures.ElementDeclaration):
                 # One instance of the base declaration for the element
                 singles.add(term.baseDeclaration())
@@ -794,7 +800,7 @@ def BuildPluralityData (term_tree):
             # Grab the data for the topmost tree and adjust it based on
             # occurrence data.
             combined = arg[-1].pop()
-            (singles, multiples) = combined
+            (singles, multiples, cards) = combined
             if 0 == node.max:
                 # If the node can't match at all, there are no occurrences
                 # at all
@@ -838,10 +844,11 @@ class _CTDAuxData (object):
         if isinstance(self.contentBasis, xs.structures.Particle):
             self.termTree = BuildTermTree(self.contentBasis)
             self.automaton = self.termTree.buildAutomaton()
-            (self.edSingles, self.edMultiples) = BuildPluralityData(self.termTree)
+            (self.edSingles, self.edMultiples, self.edCards) = BuildPluralityData(self.termTree)
         else:
             self.edSingles = set()
             self.edMultiples = set()
+            self.edCards = dict()
 
     @classmethod
     def Create (cls, ctd):
@@ -950,12 +957,15 @@ class %{ctd} (%{superclass}):
         outf.postscript().append("\n\n")
         for ed in sorted(elements, key=lambda _c: _c.schemaOrderSortKey()):
             is_plural = ed in aux.edMultiples
+            min_occurs, max_occurs = aux.edCards.get(ed, (1, 1))
             # @todo Detect and account for plurality change between this and base
             ef_map = ed._templateMap()
             if ed.scope() == ctd:
                 ef_map.update(elementDeclarationMap(ed, binding_module, **kw))
                 aux_init = []
                 ef_map['is_plural'] = repr2to3(is_plural)
+                ef_map['min_occurs'] = repr2to3(min_occurs)
+                ef_map['max_occurs'] = repr2to3(max_occurs)
                 element_uses.append(templates.replaceInText('%{use}.name() : %{use}', **ef_map))
                 if 0 == len(aux_init):
                     ef_map['aux_init'] = ''
@@ -976,7 +986,7 @@ class %{ctd} (%{superclass}):
                 _log.warning('Element use %s.%s renamed to %s', ctd.expandedName(), ed.expandedName(), ef_map['id'])
             definitions.append(templates.replaceInText('''
     # Element %{qname} uses Python identifier %{id}
-    %{use} = pyxb.binding.content.ElementDeclaration(%{name_expr}, '%{id}', '%{key}', %{is_plural}, %{decl_location}, %{aux_init})
+    %{use} = pyxb.binding.content.ElementDeclaration(%{name_expr}, '%{id}', '%{key}', %{is_plural}, %{decl_location}, %{min_occurs}, %{max_occurs}, %{aux_init})
 ''', name_expr=binding_module.literal(ed.expandedName(), **kw), **ef_map))
 
             definitions.append(templates.replaceInText('''
