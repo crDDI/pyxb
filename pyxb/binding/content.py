@@ -960,7 +960,16 @@ class ElementDeclaration (object):
         return self.__isPlural
     __isPlural = False
 
-    def __init__ (self, name, id, key, is_plural, location, element_binding=None):
+    def card (self):
+        """
+        :return: tuple with minimum and maximum occurrs
+        """
+        return (self.__min_occurs, self.__max_occurs)
+    __min_occurs = 0
+    __max_occurs = 1
+
+
+    def __init__ (self, name, id, key, is_plural, location, min_occurs=0, max_occurs=1, element_binding=None):
         """Create an ElementDeclaration instance.
 
         @param name: The name by which the element is referenced in the XML
@@ -993,6 +1002,8 @@ class ElementDeclaration (object):
         self.__key = key
         self.__isPlural = is_plural
         self.__elementBinding = element_binding
+        self.__min_occurs = min_occurs
+        self.__max_occurs = max_occurs
         super(ElementDeclaration, self).__init__()
 
     def defaultValue (self):
